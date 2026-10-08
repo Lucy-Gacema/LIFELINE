@@ -1,6 +1,4 @@
-
 from datetime import datetime, timedelta
-from typing import Optional
 
 from jose import jwt
 from passlib.context import CryptContext
@@ -11,7 +9,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_secret(raw: str) -> str:
-    
+
     return pwd_context.hash(raw)
 
 
@@ -22,7 +20,7 @@ def verify_secret(raw: str, hashed: str) -> bool:
         return False
 
 
-def create_access_token(data: dict, expires_minutes: Optional[int] = None) -> str:
+def create_access_token(data: dict, expires_minutes: int | None = None) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(
         minutes=expires_minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES

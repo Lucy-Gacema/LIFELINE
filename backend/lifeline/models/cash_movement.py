@@ -1,14 +1,16 @@
 import enum
-from sqlalchemy import Column, Numeric, String, ForeignKey, DateTime, Enum
+
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Numeric, String
 from sqlalchemy.sql import func
+
 from database import Base
 from lifeline.models.types import GUID, new_uuid
 
 
 class CashMovementType(str, enum.Enum):
     SALE = "sale"
-    DROP = "drop"          
-    PAYOUT = "payout"      
+    DROP = "drop"
+    PAYOUT = "payout"
     ADJUSTMENT = "adjustment"
 
 
@@ -21,4 +23,6 @@ class CashMovement(Base):
     amount = Column(Numeric(10, 2), nullable=False)
     reason = Column(String, nullable=True)
     created_by = Column(GUID(), ForeignKey("users.user_id"), nullable=True)
-    timestamp = Column(DateTime, nullable=False, default=func.now(), server_default=func.now())
+    timestamp = Column(
+        DateTime, nullable=False, default=func.now(), server_default=func.now()
+    )

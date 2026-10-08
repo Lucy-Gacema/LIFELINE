@@ -1,7 +1,9 @@
 import enum
-from sqlalchemy import Column, Numeric, String, ForeignKey, DateTime, Enum
-from sqlalchemy.sql import func
+
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
 from database import Base
 from lifeline.models.types import GUID, new_uuid
 
@@ -16,10 +18,14 @@ class Shift(Base):
 
     shift_id = Column(GUID(), primary_key=True, default=new_uuid)
     cashier_id = Column(GUID(), ForeignKey("users.user_id"), nullable=False)
-    status = Column(Enum(ShiftStatus, native_enum=False), nullable=False, default=ShiftStatus.OPEN)
+    status = Column(
+        Enum(ShiftStatus, native_enum=False), nullable=False, default=ShiftStatus.OPEN
+    )
 
     opening_cash = Column(Numeric(10, 2), nullable=False, default=0)
-    opened_at = Column(DateTime, nullable=False, default=func.now(), server_default=func.now())
+    opened_at = Column(
+        DateTime, nullable=False, default=func.now(), server_default=func.now()
+    )
 
     expected_cash = Column(Numeric(10, 2), nullable=True)
     actual_cash = Column(Numeric(10, 2), nullable=True)

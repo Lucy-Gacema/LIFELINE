@@ -1,25 +1,26 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from database import Base, engine
 from lifeline.core.config import settings
-from lifeline.models import create_tables
 from lifeline.routers import (
-    auth,
-    users,
-    products,
-    sales,
-    customers,
-    suppliers,
-    goods_received,
-    inventory,
-    expenses,
-    cash,
-    held_sales,
-    reports,
     assistant,
+    auth,
+    cash,
+    customers,
+    expenses,
+    goods_received,
+    held_sales,
+    inventory,
+    products,
+    reports,
+    sales,
+    suppliers,
     sync,
+    users,
+)
+from lifeline.routers import (
     settings as settings_router,
 )
 
@@ -43,10 +44,12 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def human_readable_error_handler(request: Request, exc: Exception):
-    
+
     return JSONResponse(
         status_code=500,
-        content={"detail": "Something went wrong on our side. Please try again, and if it keeps happening, contact support."},
+        content={
+            "detail": "Something went wrong on our side. Please try again, and if it keeps happening, contact support."
+        },
     )
 
 

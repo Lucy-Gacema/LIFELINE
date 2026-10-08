@@ -1,16 +1,16 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
-from pydantic import BaseModel, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ExpenseCreate(BaseModel):
-    category: str
-    amount: Decimal
+    category: str = Field(..., min_length=1)
+    amount: Decimal = Field(..., gt=0)
     payment_method: str = "cash"
-    note: Optional[str] = None
-    receipt_url: Optional[str] = None
+    note: str | None = None
+    receipt_url: str | None = None
 
 
 class ExpenseOut(BaseModel):
@@ -19,5 +19,5 @@ class ExpenseOut(BaseModel):
     category: str
     amount: Decimal
     payment_method: str
-    note: Optional[str] = None
+    note: str | None = None
     date: datetime

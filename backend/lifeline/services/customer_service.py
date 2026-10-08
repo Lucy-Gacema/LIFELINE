@@ -1,5 +1,4 @@
-from typing import List, Optional
-from sqlalchemy import or_, func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from lifeline.models.customer import Customer
@@ -22,11 +21,13 @@ def update_customer(db: Session, customer: Customer, data: CustomerUpdate) -> Cu
     return customer
 
 
-def search_customers(db: Session, term: str, limit: int = 20) -> List[Customer]:
+def search_customers(db: Session, term: str, limit: int = 20) -> list[Customer]:
     like = f"%{term.lower()}%"
     return (
         db.query(Customer)
-        .filter(or_(func.lower(Customer.name).like(like), Customer.phone.like(f"%{term}%")))
+        .filter(
+            or_(func.lower(Customer.name).like(like), Customer.phone.like(f"%{term}%"))
+        )
         .limit(limit)
         .all()
     )

@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+
 from lifeline.models.business_setting import BusinessSetting
 from lifeline.schemas.settings import BusinessSettingsOut
 
@@ -19,7 +20,7 @@ def update_settings(db: Session, updates: dict) -> dict:
         if value is None:
             continue
         row = db.query(BusinessSetting).filter(BusinessSetting.key == key).first()
-      
+
         safe_value = float(value) if hasattr(value, "quantize") else value
         if row:
             row.value = safe_value

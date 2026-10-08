@@ -4,7 +4,11 @@ def _auth_headers(token):
 
 def test_assistant_records_sale_after_confirmation(client, admin_token):
     headers = _auth_headers(admin_token)
-    client.post("/api/v1/products/", json={"product_name": "Milk", "selling_price": 60, "current_stock": 20}, headers=headers)
+    client.post(
+        "/api/v1/products/",
+        json={"product_name": "Milk", "selling_price": 60, "current_stock": 20},
+        headers=headers,
+    )
 
     first = client.post(
         "/api/v1/assistant/message",
@@ -32,6 +36,13 @@ def test_assistant_records_sale_after_confirmation(client, admin_token):
 
 def test_assistant_sales_summary_question(client, admin_token):
     headers = _auth_headers(admin_token)
-    resp = client.post("/api/v1/assistant/message", json={"message": "how much have I made today?"}, headers=headers)
+    resp = client.post(
+        "/api/v1/assistant/message",
+        json={"message": "how much have I made today?"},
+        headers=headers,
+    )
     assert resp.status_code == 200
-    assert "sales" in resp.json()["reply_text"].lower() or "ksh" in resp.json()["reply_text"].lower()
+    assert (
+        "sales" in resp.json()["reply_text"].lower()
+        or "ksh" in resp.json()["reply_text"].lower()
+    )

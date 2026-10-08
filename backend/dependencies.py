@@ -35,7 +35,7 @@ def get_current_user(
 
 
 def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
-   
+
     if current_user.role != "Admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -45,7 +45,6 @@ def get_current_admin_user(current_user: User = Depends(get_current_user)) -> Us
 
 
 def require_permission(permission: str):
-   
 
     def _check(current_user: User = Depends(get_current_user)) -> User:
         if not current_user.has_permission(permission):

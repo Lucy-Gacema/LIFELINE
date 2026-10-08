@@ -1,5 +1,5 @@
-from sqlalchemy import Column, String, Numeric
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Numeric, String
+
 from database import Base
 from lifeline.models.types import GUID, new_uuid
 

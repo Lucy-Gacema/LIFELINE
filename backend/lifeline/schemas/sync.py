@@ -1,32 +1,30 @@
-from typing import Any, List, Optional
 from pydantic import BaseModel
 
 
 class SyncOperationIn(BaseModel):
     device_id: str
     idempotency_key: str
-    operation_type: str 
+    operation_type: str
     payload: dict
-    client_timestamp: Optional[str] = None
+    client_timestamp: str | None = None
 
 
 class SyncPushRequest(BaseModel):
-    operations: List[SyncOperationIn]
+    operations: list[SyncOperationIn]
 
 
 class SyncOperationResult(BaseModel):
     idempotency_key: str
-    status: str 
-    server_id: Optional[str] = None
-    error_message: Optional[str] = None
+    status: str
+    server_id: str | None = None
+    error_message: str | None = None
 
 
 class SyncPushResponse(BaseModel):
-    results: List[SyncOperationResult]
+    results: list[SyncOperationResult]
 
 
 class SyncPullResponse(BaseModel):
-    
     server_time: str
-    products_updated_since: List[dict] = []
+    products_updated_since: list[dict] = []
     settings: dict = {}

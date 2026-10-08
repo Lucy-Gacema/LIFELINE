@@ -1,15 +1,15 @@
-import uuid
-from typing import Optional, List, Literal, Any
+from typing import Any, Literal
+
 from pydantic import BaseModel
 
 
 class AssistantMessageIn(BaseModel):
-    conversation_id: Optional[str] = None
+    conversation_id: str | None = None
     message: str
     input_mode: Literal["text", "voice"] = "text"
-   
-    confirm_action_id: Optional[str] = None
-    confirmed: Optional[bool] = None
+
+    confirm_action_id: str | None = None
+    confirmed: bool | None = None
 
 
 class ProposedAction(BaseModel):
@@ -17,13 +17,14 @@ class ProposedAction(BaseModel):
     tool_name: str
     risk_level: Literal["low", "medium", "high"]
     arguments: dict
-    summary: str 
+    summary: str
+
 
 class AssistantMessageOut(BaseModel):
     conversation_id: str
     reply_text: str
-    speak_text: Optional[str] = None  
-    proposed_action: Optional[ProposedAction] = None
-    data: Optional[Any] = None  
+    speak_text: str | None = None
+    proposed_action: ProposedAction | None = None
+    data: Any | None = None
     requires_clarification: bool = False
-    clarification_options: Optional[List[dict]] = None
+    clarification_options: list[dict] | None = None

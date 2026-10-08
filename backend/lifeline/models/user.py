@@ -1,7 +1,6 @@
 import enum
-from datetime import datetime
 
-from sqlalchemy import Column, String, Boolean, DateTime, JSON
+from sqlalchemy import JSON, Boolean, Column, DateTime, String
 from sqlalchemy.sql import func
 
 from database import Base
@@ -16,19 +15,36 @@ class UserRole(str, enum.Enum):
 
 DEFAULT_ROLE_PERMISSIONS = {
     UserRole.ADMIN: {
-        "edit_price", "apply_discount", "refund_sale", "adjust_inventory",
-        "view_profit", "edit_products", "manage_users", "access_reports",
-        "change_settings", "manage_suppliers", "manage_customers",
-        "void_transaction", "manage_expenses", "manage_shifts",
+        "edit_price",
+        "apply_discount",
+        "refund_sale",
+        "adjust_inventory",
+        "view_profit",
+        "edit_products",
+        "manage_users",
+        "access_reports",
+        "change_settings",
+        "manage_suppliers",
+        "manage_customers",
+        "void_transaction",
+        "manage_expenses",
+        "manage_shifts",
     },
     UserRole.MANAGER: {
-        "edit_price", "apply_discount", "refund_sale", "adjust_inventory",
-        "view_profit", "edit_products", "access_reports",
-        "manage_suppliers", "manage_customers", "manage_expenses",
+        "edit_price",
+        "apply_discount",
+        "refund_sale",
+        "adjust_inventory",
+        "view_profit",
+        "edit_products",
+        "access_reports",
+        "manage_suppliers",
+        "manage_customers",
+        "manage_expenses",
         "manage_shifts",
     },
     UserRole.CASHIER: {
-        "manage_shifts", 
+        "manage_shifts",
     },
 }
 
@@ -38,14 +54,16 @@ class User(Base):
 
     user_id = Column(GUID(), primary_key=True, default=new_uuid)
     email = Column(String, nullable=False, unique=True, index=True)
-    password = Column(String, nullable=False)  
-    pin = Column(String, nullable=True) 
+    password = Column(String, nullable=False)
+    pin = Column(String, nullable=True)
     role = Column(String, nullable=False, default=UserRole.CASHIER.value)
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
-    custom_permissions = Column(JSON, nullable=True)  
-    created_at = Column(DateTime, nullable=False, default=func.now(), server_default=func.now())
+    custom_permissions = Column(JSON, nullable=True)
+    created_at = Column(
+        DateTime, nullable=False, default=func.now(), server_default=func.now()
+    )
     last_login_at = Column(DateTime, nullable=True)
 
     def effective_permissions(self) -> set:

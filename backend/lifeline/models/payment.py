@@ -1,6 +1,8 @@
 import enum
-from sqlalchemy import Column, Numeric, String, ForeignKey, DateTime, Enum, Boolean
+
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Numeric, String
 from sqlalchemy.sql import func
+
 from database import Base
 from lifeline.models.types import GUID, new_uuid
 
@@ -16,8 +18,8 @@ class PaymentMethod(str, enum.Enum):
 
 
 class PaymentVerificationStatus(str, enum.Enum):
-    VERIFIED = "verified"             
-    MANUALLY_RECORDED = "manually_recorded"  
+    VERIFIED = "verified"
+    MANUALLY_RECORDED = "manually_recorded"
     FAILED = "failed"
     PENDING = "pending"
 
@@ -29,7 +31,7 @@ class Payment(Base):
     sale_id = Column(GUID(), ForeignKey("sales.sale_id"), nullable=False)
     method = Column(Enum(PaymentMethod, native_enum=False), nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)
-    amount_tendered = Column(Numeric(10, 2), nullable=True)  
+    amount_tendered = Column(Numeric(10, 2), nullable=True)
     change_given = Column(Numeric(10, 2), nullable=True)
 
     verification_status = Column(
@@ -37,8 +39,10 @@ class Payment(Base):
         nullable=False,
         default=PaymentVerificationStatus.MANUALLY_RECORDED,
     )
-    transaction_reference = Column(String, nullable=True)  
+    transaction_reference = Column(String, nullable=True)
     phone_number = Column(String, nullable=True)
 
     cashier_id = Column(GUID(), ForeignKey("users.user_id"), nullable=True)
-    timestamp = Column(DateTime, nullable=False, default=func.now(), server_default=func.now())
+    timestamp = Column(
+        DateTime, nullable=False, default=func.now(), server_default=func.now()
+    )

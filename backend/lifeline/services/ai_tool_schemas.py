@@ -43,7 +43,17 @@ TOOLS = [
         "parameters": {
             "type": "object",
             "properties": {
-                "period": {"type": "string", "enum": ["today", "yesterday", "this_week", "last_week", "this_month", "last_month"]}
+                "period": {
+                    "type": "string",
+                    "enum": [
+                        "today",
+                        "yesterday",
+                        "this_week",
+                        "last_week",
+                        "this_month",
+                        "last_month",
+                    ],
+                }
             },
         },
     },
@@ -53,7 +63,17 @@ TOOLS = [
         "parameters": {
             "type": "object",
             "properties": {
-                "period": {"type": "string", "enum": ["today", "yesterday", "this_week", "last_week", "this_month", "last_month"]}
+                "period": {
+                    "type": "string",
+                    "enum": [
+                        "today",
+                        "yesterday",
+                        "this_week",
+                        "last_week",
+                        "this_month",
+                        "last_month",
+                    ],
+                }
             },
         },
     },
@@ -121,8 +141,20 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "product_query": {"type": "string"},
-                "quantity_changed": {"type": "integer", "description": "Positive to add stock, negative to remove."},
-                "reason": {"type": "string", "enum": ["restock", "damage", "write_off", "correction", "initial_stock"]},
+                "quantity_changed": {
+                    "type": "integer",
+                    "description": "Positive to add stock, negative to remove.",
+                },
+                "reason": {
+                    "type": "string",
+                    "enum": [
+                        "restock",
+                        "damage",
+                        "write_off",
+                        "correction",
+                        "initial_stock",
+                    ],
+                },
                 "note": {"type": "string"},
             },
             "required": ["product_query", "quantity_changed", "reason"],
@@ -166,7 +198,18 @@ TOOLS = [
                     "items": {
                         "type": "object",
                         "properties": {
-                            "method": {"type": "string", "enum": ["cash", "card", "mpesa", "qr", "wallet", "store_credit", "custom"]},
+                            "method": {
+                                "type": "string",
+                                "enum": [
+                                    "cash",
+                                    "card",
+                                    "mpesa",
+                                    "qr",
+                                    "wallet",
+                                    "store_credit",
+                                    "custom",
+                                ],
+                            },
                             "amount": {"type": "number"},
                             "amount_tendered": {"type": "number"},
                             "transaction_reference": {"type": "string"},
@@ -191,7 +234,10 @@ TOOLS = [
                     "type": "array",
                     "items": {
                         "type": "object",
-                        "properties": {"sale_item_id": {"type": "string"}, "quantity": {"type": "integer"}},
+                        "properties": {
+                            "sale_item_id": {"type": "string"},
+                            "quantity": {"type": "integer"},
+                        },
                     },
                 },
                 "reason": {"type": "string"},

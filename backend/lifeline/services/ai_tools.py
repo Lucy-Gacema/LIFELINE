@@ -1,25 +1,22 @@
-
 import uuid
-from decimal import Decimal, InvalidOperation
-from typing import Optional
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
 from lifeline.models.product import Product
-from lifeline.models.customer import Customer
 from lifeline.models.sale import Sale
 from lifeline.models.shift import Shift, ShiftStatus
-from lifeline.schemas.sales import SaleCreate, SaleItemIn, PaymentIn, PaymentMethodEnum
 from lifeline.schemas.customers import CustomerCreate
-from lifeline.schemas.inventory_logs import ReasonEnum
 from lifeline.schemas.expenses import ExpenseCreate
+from lifeline.schemas.inventory_logs import ReasonEnum
+from lifeline.schemas.sales import PaymentIn, PaymentMethodEnum, SaleCreate, SaleItemIn
 from lifeline.services import (
-    product_service,
     customer_service,
-    sale_service,
-    inventory_service,
     expense_service,
+    inventory_service,
+    product_service,
     report_service,
+    sale_service,
 )
 
 RISK_LEVELS = {
@@ -100,7 +97,9 @@ def lookup_customer(db: Session, user, query: str) -> dict:
     }
 
 
-def lookup_transaction(db: Session, user, receipt_number: Optional[str] = None, sale_id: Optional[str] = None) -> dict:
+def lookup_transaction(
+    db: Session, user, receipt_number: str | None = None, sale_id: str | None = None
+) -> dict:
     query = db.query(Sale)
     if sale_id:
         sale = query.filter(Sale.sale_id == sale_id).first()
@@ -118,7 +117,12 @@ def lookup_transaction(db: Session, user, receipt_number: Optional[str] = None, 
         "status": sale.status if isinstance(sale.status, str) else sale.status.value,
         "timestamp": sale.timestamp.isoformat(),
         "items": [
-            {"name": i.item_name, "quantity": i.quantity, "line_total": float(i.line_total), "sale_item_id": str(i.sale_item_id)}
+            {
+                "name": i.item_name,
+                "quantity": i.quantity,
+                "line_total": float(i.line_total),
+                "sale_item_id": str(i.sale_item_id),
+            }
             for i in sale.items
         ],
     }
@@ -137,20 +141,32 @@ def get_low_stock_products(db: Session, user) -> dict:
     products = product_service.get_low_stock_products(db)
     return {
         "products": [
-            {"name": p.product_name, "current_stock": p.current_stock, "minimum_stock": p.minimum_stock}
+            {
+                "name": p.product_name,
+                "current_stock": p.current_stock,
+                "minimum_stock": p.minimum_stock,
+            }
             for p in products
         ]
     }
 
 
-def get_top_products(db: Session, user, period: str = "today", by: str = "quantity", limit: int = 5) -> dict:
+def get_top_products(
+    db: Session, user, period: str = "today", by: str = "quantity", limit: int = 5
+) -> dict:
     return {"products": report_service.get_top_products(db, period, limit=limit, by=by)}
 
 
 def get_cash_drawer_status(db: Session, user) -> dict:
-    shift = db.query(Shift).filter(Shift.cashier_id == user.user_id, Shift.status == ShiftStatus.OPEN).first()
+    shift = (
+        db.query(Shift)
+        .filter(Shift.cashier_id == user.user_id, Shift.status == ShiftStatus.OPEN)
+        .first()
+    )
     if not shift:
-        raise ToolError("You don't have an open shift right now, so there's no drawer to check.")
+        raise ToolError(
+            "You don't have an open shift right now, so there's no drawer to check."
+        )
     return report_service.get_cash_drawer_status(db, shift)
 
 
@@ -159,9 +175,9 @@ def get_business_health(db: Session, user) -> dict:
 
 
 def calculate_cart(db: Session, user, items: list) -> dict:
-    
+
     resolved = []
-    total = Decimal("0")
+    total = Decimal(0)
     ambiguous = []
     not_found = []
 
@@ -169,16 +185,29 @@ def calculate_cart(db: Session, user, items: list) -> dict:
         qty = int(raw.get("quantity", 1))
         product = None
         if raw.get("product_id"):
-            product = db.query(Product).filter(Product.product_id == raw["product_id"]).first()
+            product = (
+                db.query(Product)
+                .filter(Product.product_id == raw["product_id"])
+                .first()
+            )
         elif raw.get("product_name"):
             matches = product_service.find_product_by_lookup(db, raw["product_name"])
             if len(matches) == 1:
                 product = matches[0]
             elif len(matches) > 1:
-                ambiguous.append({
-                    "query": raw["product_name"],
-                    "options": [{"product_id": str(m.product_id), "name": m.product_name, "price": float(m.selling_price)} for m in matches],
-                })
+                ambiguous.append(
+                    {
+                        "query": raw["product_name"],
+                        "options": [
+                            {
+                                "product_id": str(m.product_id),
+                                "name": m.product_name,
+                                "price": float(m.selling_price),
+                            }
+                            for m in matches
+                        ],
+                    }
+                )
                 continue
             else:
                 not_found.append(raw["product_name"])
@@ -189,25 +218,41 @@ def calculate_cart(db: Session, user, items: list) -> dict:
 
         line_total = product.selling_price * qty
         total += line_total
-        resolved.append({
-            "product_id": str(product.product_id),
-            "name": product.product_name,
-            "quantity": qty,
-            "unit_price": float(product.selling_price),
-            "line_total": float(line_total),
-            "current_stock": product.current_stock,
-        })
+        resolved.append(
+            {
+                "product_id": str(product.product_id),
+                "name": product.product_name,
+                "quantity": qty,
+                "unit_price": float(product.selling_price),
+                "line_total": float(line_total),
+                "current_stock": product.current_stock,
+            }
+        )
 
-    return {"resolved_items": resolved, "ambiguous": ambiguous, "not_found": not_found, "total": float(total)}
+    return {
+        "resolved_items": resolved,
+        "ambiguous": ambiguous,
+        "not_found": not_found,
+        "total": float(total),
+    }
 
 
-def create_customer(db: Session, user, name: str, phone: Optional[str] = None) -> dict:
+def create_customer(db: Session, user, name: str, phone: str | None = None) -> dict:
     _require_permission(user, "create_customer")
-    customer = customer_service.create_customer(db, CustomerCreate(name=name, phone=phone))
+    customer = customer_service.create_customer(
+        db, CustomerCreate(name=name, phone=phone)
+    )
     return {"customer_id": str(customer.customer_id), "name": customer.name}
 
 
-def adjust_inventory(db: Session, user, product_query: str, quantity_changed: int, reason: str, note: Optional[str] = None) -> dict:
+def adjust_inventory(
+    db: Session,
+    user,
+    product_query: str,
+    quantity_changed: int,
+    reason: str,
+    note: str | None = None,
+) -> dict:
     _require_permission(user, "adjust_inventory")
     matches = product_service.find_product_by_lookup(db, product_query)
     if not matches:
@@ -219,27 +264,59 @@ def adjust_inventory(db: Session, user, product_query: str, quantity_changed: in
         reason_enum = ReasonEnum(reason)
     except ValueError:
         reason_enum = ReasonEnum.CORRECTION
-    log = inventory_service.adjust_stock(db, product, quantity_changed, reason_enum, user_id=user.user_id, note=note)
-    return {"product": product.product_name, "previous_quantity": log.previous_quantity, "new_quantity": log.new_quantity}
+    log = inventory_service.adjust_stock(
+        db, product, quantity_changed, reason_enum, user_id=user.user_id, note=note
+    )
+    return {
+        "product": product.product_name,
+        "previous_quantity": log.previous_quantity,
+        "new_quantity": log.new_quantity,
+    }
 
 
-def create_expense(db: Session, user, category: str, amount: float, note: Optional[str] = None, payment_method: str = "cash") -> dict:
+def create_expense(
+    db: Session,
+    user,
+    category: str,
+    amount: float,
+    note: str | None = None,
+    payment_method: str = "cash",
+) -> dict:
     _require_permission(user, "create_expense")
     expense = expense_service.create_expense(
-        db, ExpenseCreate(category=category, amount=Decimal(str(amount)), note=note, payment_method=payment_method), user
+        db,
+        ExpenseCreate(
+            category=category,
+            amount=Decimal(str(amount)),
+            note=note,
+            payment_method=payment_method,
+        ),
+        user,
     )
-    return {"expense_id": str(expense.expense_id), "category": expense.category, "amount": float(expense.amount)}
+    return {
+        "expense_id": str(expense.expense_id),
+        "category": expense.category,
+        "amount": float(expense.amount),
+    }
 
 
-
-def create_sale(db: Session, user, items: list, payments: list, customer_id: Optional[str] = None,
-                 idempotency_key: Optional[str] = None, note: Optional[str] = None) -> dict:
+def create_sale(
+    db: Session,
+    user,
+    items: list,
+    payments: list,
+    customer_id: str | None = None,
+    idempotency_key: str | None = None,
+    note: str | None = None,
+) -> dict:
     sale_items = [
         SaleItemIn(
             product_id=i.get("product_id"),
             product_name=i.get("product_name"),
             quantity=int(i["quantity"]),
-            unit_price=Decimal(str(i["unit_price"])) if i.get("unit_price") is not None else None,
+            unit_price=Decimal(str(i["unit_price"]))
+            if i.get("unit_price") is not None
+            else None,
         )
         for i in items
     ]
@@ -247,7 +324,9 @@ def create_sale(db: Session, user, items: list, payments: list, customer_id: Opt
         PaymentIn(
             method=PaymentMethodEnum(p["method"]),
             amount=Decimal(str(p["amount"])),
-            amount_tendered=Decimal(str(p["amount_tendered"])) if p.get("amount_tendered") is not None else None,
+            amount_tendered=Decimal(str(p["amount_tendered"]))
+            if p.get("amount_tendered") is not None
+            else None,
             transaction_reference=p.get("transaction_reference"),
         )
         for p in payments
@@ -268,17 +347,25 @@ def create_sale(db: Session, user, items: list, payments: list, customer_id: Opt
     }
 
 
-def create_return(db: Session, user, sale_id: str, sale_item_ids_quantities: list, reason: str) -> dict:
+def create_return(
+    db: Session, user, sale_id: str, sale_item_ids_quantities: list, reason: str
+) -> dict:
     from lifeline.schemas.sales import RefundCreate, RefundItemIn
     from lifeline.services import refund_service
 
     data = RefundCreate(
         sale_id=sale_id,
-        items=[RefundItemIn(sale_item_id=x["sale_item_id"], quantity=x["quantity"]) for x in sale_item_ids_quantities],
+        items=[
+            RefundItemIn(sale_item_id=x["sale_item_id"], quantity=x["quantity"])
+            for x in sale_item_ids_quantities
+        ],
         reason=reason,
     )
     refund = refund_service.create_refund(db, data, user)
-    return {"refund_id": str(refund.refund_id), "total_amount": float(refund.total_amount)}
+    return {
+        "refund_id": str(refund.refund_id),
+        "total_amount": float(refund.total_amount),
+    }
 
 
 TOOL_FUNCTIONS = {

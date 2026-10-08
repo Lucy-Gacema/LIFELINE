@@ -1,6 +1,7 @@
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime
-from sqlalchemy.sql import func
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
 from database import Base
 from lifeline.models.types import GUID, new_uuid
 
@@ -9,13 +10,19 @@ class GoodsReceivedNote(Base):
     __tablename__ = "goods_received_notes"
 
     grn_id = Column(GUID(), primary_key=True, default=new_uuid)
-    purchase_order_id = Column(GUID(), ForeignKey("purchase_orders.purchase_order_id"), nullable=False)
+    purchase_order_id = Column(
+        GUID(), ForeignKey("purchase_orders.purchase_order_id"), nullable=False
+    )
     received_by = Column(GUID(), ForeignKey("users.user_id"), nullable=True)
-    received_at = Column(DateTime, nullable=False, default=func.now(), server_default=func.now())
+    received_at = Column(
+        DateTime, nullable=False, default=func.now(), server_default=func.now()
+    )
     notes = Column(String, nullable=True)
 
     purchase_order = relationship("PurchaseOrder")
-    items = relationship("GoodsReceivedNoteItem", backref="grn", cascade="all, delete-orphan")
+    items = relationship(
+        "GoodsReceivedNoteItem", backref="grn", cascade="all, delete-orphan"
+    )
 
 
 class GoodsReceivedNoteItem(Base):

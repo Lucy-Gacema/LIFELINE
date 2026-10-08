@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, List
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -17,38 +17,38 @@ class PaymentMethodEnum(str, enum.Enum):
 
 
 class SaleItemIn(BaseModel):
-    product_id: Optional[uuid.UUID] = None
-    product_name: Optional[str] = None  
+    product_id: uuid.UUID | None = None
+    product_name: str | None = None
     quantity: int = Field(..., gt=0)
-    unit_price: Optional[Decimal] = None  
-    discount_amount: Decimal = 0
+    unit_price: Decimal | None = Field(None, gt=0)
+    discount_amount: Decimal = Field(0, ge=0)
 
 
 class PaymentIn(BaseModel):
     method: PaymentMethodEnum
-    amount: Decimal
-    amount_tendered: Optional[Decimal] = None
-    transaction_reference: Optional[str] = None
-    phone_number: Optional[str] = None
+    amount: Decimal = Field(..., gt=0)
+    amount_tendered: Decimal | None = Field(None, ge=0)
+    transaction_reference: str | None = None
+    phone_number: str | None = None
 
 
 class SaleCreate(BaseModel):
     idempotency_key: str
-    items: List[SaleItemIn]
-    payments: List[PaymentIn]
-    customer_id: Optional[uuid.UUID] = None
-    discount_total: Decimal = 0
-    note: Optional[str] = None
-    shift_id: Optional[uuid.UUID] = None
+    items: list[SaleItemIn]
+    payments: list[PaymentIn]
+    customer_id: uuid.UUID | None = None
+    discount_total: Decimal = Field(0, ge=0)
+    note: str | None = None
+    shift_id: uuid.UUID | None = None
     created_via: str = "manual"
-    device_id: Optional[str] = None
+    device_id: str | None = None
     allow_negative_stock: bool = False
 
 
 class SaleItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     sale_item_id: uuid.UUID
-    product_id: Optional[uuid.UUID] = None
+    product_id: uuid.UUID | None = None
     product_name_snapshot: str
     quantity: int
     unit_price: Decimal
@@ -63,29 +63,29 @@ class PaymentOut(BaseModel):
     payment_id: uuid.UUID
     method: str
     amount: Decimal
-    amount_tendered: Optional[Decimal] = None
-    change_given: Optional[Decimal] = None
+    amount_tendered: Decimal | None = None
+    change_given: Decimal | None = None
     verification_status: str
-    transaction_reference: Optional[str] = None
+    transaction_reference: str | None = None
 
 
 class SaleOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     sale_id: uuid.UUID
     idempotency_key: str
-    receipt_number: Optional[str] = None
-    customer_id: Optional[uuid.UUID] = None
-    cashier_id: Optional[uuid.UUID] = None
+    receipt_number: str | None = None
+    customer_id: uuid.UUID | None = None
+    cashier_id: uuid.UUID | None = None
     subtotal: Decimal
     discount_total: Decimal
     tax_total: Decimal
     total_amount: Decimal
     status: str
-    note: Optional[str] = None
+    note: str | None = None
     created_via: str
     timestamp: datetime
-    items: List[SaleItemOut] = []
-    payments: List[PaymentOut] = []
+    items: list[SaleItemOut] = []
+    payments: list[PaymentOut] = []
 
 
 class RefundItemIn(BaseModel):
@@ -95,6 +95,6 @@ class RefundItemIn(BaseModel):
 
 class RefundCreate(BaseModel):
     sale_id: uuid.UUID
-    items: List[RefundItemIn]
+    items: list[RefundItemIn]
     reason: str
     refund_method: str = "cash"

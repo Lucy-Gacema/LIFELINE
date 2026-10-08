@@ -1,21 +1,21 @@
-
-from datetime import datetime, timedelta, time
+from datetime import datetime, time, timedelta
 from decimal import Decimal
-from typing import Optional, Tuple
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from lifeline.models.customer import Customer
+from lifeline.models.expense import Expense
+from lifeline.models.product import Product
 from lifeline.models.sale import Sale, SaleStatus
 from lifeline.models.sale_item import SaleItem
-from lifeline.models.payment import Payment
-from lifeline.models.product import Product
-from lifeline.models.expense import Expense
-from lifeline.models.customer import Customer
 from lifeline.models.supplier import Supplier
 
 
-def resolve_period(period: str, reference: Optional[datetime] = None) -> Tuple[datetime, datetime, str]:
-    
+def resolve_period(
+    period: str, reference: datetime | None = None
+) -> tuple[datetime, datetime, str]:
+
     now = reference or datetime.utcnow()
     today_start = datetime.combine(now.date(), time.min)
 
@@ -47,18 +47,30 @@ def get_sales_summary(db: Session, period: str = "today") -> dict:
     start, end, label = resolve_period(period)
     sales = (
         db.query(Sale)
-        .filter(Sale.timestamp >= start, Sale.timestamp < end, Sale.status.in_([SaleStatus.COMPLETED, SaleStatus.PARTIALLY_REFUNDED]))
+        .filter(
+            Sale.timestamp >= start,
+            Sale.timestamp < end,
+            Sale.status.in_([SaleStatus.COMPLETED, SaleStatus.PARTIALLY_REFUNDED]),
+        )
         .all()
     )
-    total_sales = sum((s.total_amount for s in sales), Decimal("0"))
+    total_sales = sum((s.total_amount for s in sales), Decimal(0))
     transaction_count = len(sales)
-    avg_transaction = (total_sales / transaction_count) if transaction_count else Decimal("0")
+    avg_transaction = (
+        (total_sales / transaction_count) if transaction_count else Decimal(0)
+    )
 
     payment_breakdown = {}
     for s in sales:
         for p in s.payments:
-            payment_breakdown[p.method.value if hasattr(p.method, "value") else p.method] = (
-                payment_breakdown.get(p.method.value if hasattr(p.method, "value") else p.method, Decimal("0")) + p.amount
+            payment_breakdown[
+                p.method.value if hasattr(p.method, "value") else p.method
+            ] = (
+                payment_breakdown.get(
+                    p.method.value if hasattr(p.method, "value") else p.method,
+                    Decimal(0),
+                )
+                + p.amount
             )
 
     return {
@@ -77,14 +89,22 @@ def get_profit_summary(db: Session, period: str = "today") -> dict:
     items = (
         db.query(SaleItem)
         .join(Sale, Sale.sale_id == SaleItem.sale_id)
-        .filter(Sale.timestamp >= start, Sale.timestamp < end, Sale.status.in_([SaleStatus.COMPLETED, SaleStatus.PARTIALLY_REFUNDED]))
+        .filter(
+            Sale.timestamp >= start,
+            Sale.timestamp < end,
+            Sale.status.in_([SaleStatus.COMPLETED, SaleStatus.PARTIALLY_REFUNDED]),
+        )
         .all()
     )
-    revenue = Decimal("0")
-    cost = Decimal("0")
+    revenue = Decimal(0)
+    cost = Decimal(0)
     for item in items:
         revenue += item.line_total
-        buying_price = item.product.buying_price if item.product and item.product.buying_price else Decimal("0")
+        buying_price = (
+            item.product.buying_price
+            if item.product and item.product.buying_price
+            else Decimal(0)
+        )
         cost += buying_price * item.quantity
 
     gross_profit = revenue - cost
@@ -97,27 +117,52 @@ def get_profit_summary(db: Session, period: str = "today") -> dict:
     }
 
 
-def get_top_products(db: Session, period: str = "today", limit: int = 5, by: str = "quantity") -> list:
+def get_top_products(
+    db: Session, period: str = "today", limit: int = 5, by: str = "quantity"
+) -> list:
     start, end, label = resolve_period(period)
     items = (
         db.query(SaleItem)
         .join(Sale, Sale.sale_id == SaleItem.sale_id)
-        .filter(Sale.timestamp >= start, Sale.timestamp < end, Sale.status.in_([SaleStatus.COMPLETED, SaleStatus.PARTIALLY_REFUNDED]))
+        .filter(
+            Sale.timestamp >= start,
+            Sale.timestamp < end,
+            Sale.status.in_([SaleStatus.COMPLETED, SaleStatus.PARTIALLY_REFUNDED]),
+        )
         .all()
     )
     agg = {}
     for item in items:
         key = item.product_id or item.product_name_snapshot
-        row = agg.setdefault(key, {"name": item.item_name, "quantity": 0, "revenue": Decimal("0"), "profit": Decimal("0")})
+        row = agg.setdefault(
+            key,
+            {
+                "name": item.item_name,
+                "quantity": 0,
+                "revenue": Decimal(0),
+                "profit": Decimal(0),
+            },
+        )
         row["quantity"] += item.quantity
         row["revenue"] += item.line_total
-        buying_price = item.product.buying_price if item.product and item.product.buying_price else Decimal("0")
+        buying_price = (
+            item.product.buying_price
+            if item.product and item.product.buying_price
+            else Decimal(0)
+        )
         row["profit"] += item.line_total - (buying_price * item.quantity)
 
-    sort_key = "quantity" if by == "quantity" else ("revenue" if by == "revenue" else "profit")
+    sort_key = (
+        "quantity" if by == "quantity" else ("revenue" if by == "revenue" else "profit")
+    )
     ranked = sorted(agg.values(), key=lambda r: r[sort_key], reverse=True)[:limit]
     return [
-        {"name": r["name"], "quantity": r["quantity"], "revenue": float(r["revenue"]), "profit": float(r["profit"])}
+        {
+            "name": r["name"],
+            "quantity": r["quantity"],
+            "revenue": float(r["revenue"]),
+            "profit": float(r["profit"]),
+        }
         for r in ranked
     ]
 
@@ -132,9 +177,13 @@ def get_slow_moving_products(db: Session, days: int = 14) -> list:
         .distinct()
         .all()
     }
-    products = db.query(Product).filter(Product.is_active == True).all()  # noqa: E712
+    products = db.query(Product).filter(Product.is_active == True).all()
     return [
-        {"product_id": str(p.product_id), "product_name": p.product_name, "current_stock": p.current_stock}
+        {
+            "product_id": str(p.product_id),
+            "product_name": p.product_name,
+            "current_stock": p.current_stock,
+        }
         for p in products
         if p.product_id not in recent_product_ids
     ]
@@ -142,6 +191,7 @@ def get_slow_moving_products(db: Session, days: int = 14) -> list:
 
 def get_cash_drawer_status(db: Session, shift) -> dict:
     from lifeline.services.cash_service import get_expected_cash
+
     expected = get_expected_cash(db, shift)
     return {
         "shift_id": str(shift.shift_id),
@@ -154,10 +204,10 @@ def get_cash_drawer_status(db: Session, shift) -> dict:
 def get_expense_summary(db: Session, period: str = "today") -> dict:
     start, end, label = resolve_period(period)
     expenses = db.query(Expense).filter(Expense.date >= start, Expense.date < end).all()
-    total = sum((e.amount for e in expenses), Decimal("0"))
+    total = sum((e.amount for e in expenses), Decimal(0))
     by_category = {}
     for e in expenses:
-        by_category[e.category] = by_category.get(e.category, Decimal("0")) + e.amount
+        by_category[e.category] = by_category.get(e.category, Decimal(0)) + e.amount
     return {
         "period": label,
         "total": float(total),
@@ -167,25 +217,36 @@ def get_expense_summary(db: Session, period: str = "today") -> dict:
 
 
 def get_business_health_snapshot(db: Session) -> dict:
-  
+
     sales_today = get_sales_summary(db, "today")
     profit_today = get_profit_summary(db, "today")
     top_products = get_top_products(db, "today", limit=3)
 
     low_stock_products = [
-        {"product_id": str(p.product_id), "name": p.product_name, "current_stock": p.current_stock, "minimum_stock": p.minimum_stock}
-        for p in db.query(Product).filter(Product.is_active == True).all()  # noqa: E712
+        {
+            "product_id": str(p.product_id),
+            "name": p.product_name,
+            "current_stock": p.current_stock,
+            "minimum_stock": p.minimum_stock,
+        }
+        for p in db.query(Product).filter(Product.is_active == True).all()
         if p.current_stock <= p.minimum_stock
     ]
-    outstanding_credit = db.query(func.coalesce(func.sum(Customer.outstanding_balance), 0)).scalar()
-    supplier_balances = db.query(func.coalesce(func.sum(Supplier.amount_owed), 0)).scalar()
+    outstanding_credit = db.query(
+        func.coalesce(func.sum(Customer.outstanding_balance), 0)
+    ).scalar()
+    supplier_balances = db.query(
+        func.coalesce(func.sum(Supplier.amount_owed), 0)
+    ).scalar()
 
     return {
         "today": sales_today,
         "profit_today": profit_today,
         "top_products_today": top_products,
         "low_stock_products": low_stock_products,
-        "out_of_stock_count": len([p for p in low_stock_products if p["current_stock"] <= 0]),
+        "out_of_stock_count": len(
+            [p for p in low_stock_products if p["current_stock"] <= 0]
+        ),
         "outstanding_customer_credit": float(outstanding_credit or 0),
         "supplier_balances_owed": float(supplier_balances or 0),
     }

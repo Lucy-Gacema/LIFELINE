@@ -1,9 +1,7 @@
-from typing import Optional
-from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from lifeline.models.product import Product
 from lifeline.models.inventory_logs import InventoryLogs
+from lifeline.models.product import Product
 from lifeline.schemas.inventory_logs import ReasonEnum
 from lifeline.services import audit_service
 
@@ -25,16 +23,18 @@ def adjust_stock(
     quantity_changed: int,
     reason: ReasonEnum,
     user_id=None,
-    note: Optional[str] = None,
+    note: str | None = None,
     allow_negative_stock: bool = False,
     commit: bool = True,
 ) -> InventoryLogs:
-   
+
     previous_quantity = product.current_stock
     new_quantity = previous_quantity + quantity_changed
 
     if new_quantity < 0 and not allow_negative_stock:
-        raise InsufficientStockError(product, requested=abs(quantity_changed), available=previous_quantity)
+        raise InsufficientStockError(
+            product, requested=abs(quantity_changed), available=previous_quantity
+        )
 
     product.current_stock = new_quantity
 

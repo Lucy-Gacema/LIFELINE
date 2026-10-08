@@ -1,10 +1,15 @@
 import json
 import re
 import uuid
-from typing import Optional
+
 from sqlalchemy.orm import Session
+
 from lifeline.core.config import settings
-from lifeline.schemas.assistant import AssistantMessageIn, AssistantMessageOut, ProposedAction
+from lifeline.schemas.assistant import (
+    AssistantMessageIn,
+    AssistantMessageOut,
+    ProposedAction,
+)
 from lifeline.services import ai_tools
 from lifeline.services.ai_tool_schemas import TOOLS
 from lifeline.services.ai_tools import RISK_LEVELS, ToolError
@@ -31,58 +36,115 @@ Rules you must always follow:
 """
 
 _NUMBER_WORDS = {
-    "a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
-    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "a": 1,
+    "an": 1,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
 }
 
 _SALE_TRIGGER = re.compile(r"\b(sold|sell|selling)\b", re.IGNORECASE)
 _ITEM_SPLIT = re.compile(r",| and ", re.IGNORECASE)
-_FILLER_WORDS = {"i", "a", "an", "the", "of", "some", "to", "me", "customer", "bought", "for", "paid"}
-_UNIT_WORDS = {"packets", "packet", "pieces", "piece", "bottles", "bottle", "loaves", "loaf", "litres", "litre", "liters", "liter", "kgs", "kg", "units", "unit"}
+_FILLER_WORDS = {
+    "i",
+    "a",
+    "an",
+    "the",
+    "of",
+    "some",
+    "to",
+    "me",
+    "customer",
+    "bought",
+    "for",
+    "paid",
+}
+_UNIT_WORDS = {
+    "packets",
+    "packet",
+    "pieces",
+    "piece",
+    "bottles",
+    "bottle",
+    "loaves",
+    "loaf",
+    "litres",
+    "litre",
+    "liters",
+    "liter",
+    "kgs",
+    "kg",
+    "units",
+    "unit",
+}
+
 
 def _get_history(conversation_id: str) -> list:
     return _CONVERSATIONS.setdefault(conversation_id, [])
 
+
 def _summarize_tool_call(tool_name: str, arguments: dict) -> str:
     if tool_name == "create_sale":
         items = arguments.get("items", [])
-        lines = [f"{i.get('quantity')} × {i.get('product_name') or i.get('product_id')}" for i in items]
+        lines = [
+            f"{i.get('quantity')} × {i.get('product_name') or i.get('product_id')}"
+            for i in items
+        ]
         payments = arguments.get("payments", [])
         pay_lines = [f"{p.get('amount')} via {p.get('method')}" for p in payments]
-        return "Record sale: " + ", ".join(lines) + " — Payment: " + ", ".join(pay_lines)
+        return (
+            "Record sale: " + ", ".join(lines) + " — Payment: " + ", ".join(pay_lines)
+        )
     if tool_name == "create_return":
         return f"Process a return on sale {arguments.get('sale_id')}: {arguments.get('reason')}"
     if tool_name == "adjust_inventory":
         return f"Adjust stock for {arguments.get('product_query')} by {arguments.get('quantity_changed')} ({arguments.get('reason')})"
     if tool_name == "create_expense":
-        return f"Record expense: {arguments.get('category')} — {arguments.get('amount')}"
+        return (
+            f"Record expense: {arguments.get('category')} — {arguments.get('amount')}"
+        )
     if tool_name == "create_customer":
         return f"Create new customer: {arguments.get('name')}"
     return f"{tool_name}({json.dumps(arguments)})"
+
+
 def _execute_tool(db: Session, user, tool_name: str, arguments: dict) -> dict:
     func = ai_tools.TOOL_FUNCTIONS.get(tool_name)
     if not func:
         raise ToolError(f"Unknown tool: {tool_name}")
     return func(db, user, **arguments)
 
-def _run_with_gemini(db: Session, user, msg_in: AssistantMessageIn, conversation_id: str) -> AssistantMessageOut:
+
+def _run_with_gemini(
+    db: Session, user, msg_in: AssistantMessageIn, conversation_id: str
+) -> AssistantMessageOut:
     from google import genai
     from google.genai import types
 
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
     history = _get_history(conversation_id)
-    history.append(types.Content(role="user", parts=[types.Part.from_text(text=msg_in.message)]))
+    history.append(
+        types.Content(role="user", parts=[types.Part.from_text(text=msg_in.message)])
+    )
 
-    proposed_action: Optional[ProposedAction] = None
+    proposed_action: ProposedAction | None = None
     final_text = ""
     gemini_tools = [types.Tool(function_declarations=TOOLS)]
 
     for _ in range(6):
-        combined_prompt = SYSTEM_PROMPT + f"\nThe logged-in user's role is {user.role}. Their permissions: {sorted(user.effective_permissions())}."
+        combined_prompt = (
+            SYSTEM_PROMPT
+            + f"\nThe logged-in user's role is {user.role}. Their permissions: {sorted(user.effective_permissions())}."
+        )
         config = types.GenerateContentConfig(
-            system_instruction=combined_prompt,
-            tools=gemini_tools,
-            temperature=0.2
+            system_instruction=combined_prompt, tools=gemini_tools, temperature=0.2
         )
 
         response = client.models.generate_content(
@@ -100,10 +162,21 @@ def _run_with_gemini(db: Session, user, msg_in: AssistantMessageIn, conversation
         if not function_calls:
             break
 
-        risky_call = next((fc for fc in function_calls if RISK_LEVELS.get(fc.name) in ("medium", "high")), None)
+        risky_call = next(
+            (
+                fc
+                for fc in function_calls
+                if RISK_LEVELS.get(fc.name) in ("medium", "high")
+            ),
+            None,
+        )
         if risky_call:
             action_id = str(uuid.uuid4())
-            args_dict = risky_call.args if isinstance(risky_call.args, dict) else dict(risky_call.args)
+            args_dict = (
+                risky_call.args
+                if isinstance(risky_call.args, dict)
+                else dict(risky_call.args)
+            )
             proposed_action = ProposedAction(
                 action_id=action_id,
                 tool_name=risky_call.name,
@@ -130,8 +203,7 @@ def _run_with_gemini(db: Session, user, msg_in: AssistantMessageIn, conversation
                 content = {"error": f"Something went wrong: {e}"}
             function_responses.append(
                 types.Part.from_function_response(
-                    name=fc.name,
-                    response={"result": content}
+                    name=fc.name, response={"result": content}
                 )
             )
 
@@ -144,12 +216,15 @@ def _run_with_gemini(db: Session, user, msg_in: AssistantMessageIn, conversation
         proposed_action=proposed_action,
     )
 
-def _parse_quantity(token: str) -> Optional[int]:
+
+def _parse_quantity(token: str) -> int | None:
     token = token.strip().lower()
     if token.isdigit():
         return int(token)
     return _NUMBER_WORDS.get(token)
-def _extract_quantity_and_product(segment: str) -> Optional[tuple]:
+
+
+def _extract_quantity_and_product(segment: str) -> tuple | None:
     words = [w for w in re.findall(r"[a-zA-Z']+|\d+", segment)]
     quantity = None
     product_words = []
@@ -168,26 +243,46 @@ def _extract_quantity_and_product(segment: str) -> Optional[tuple]:
         return None
     return (quantity or 1, " ".join(product_words).strip())
 
-def _rule_based_reply(db: Session, user, msg_in: AssistantMessageIn, conversation_id: str) -> AssistantMessageOut:
+
+def _rule_based_reply(
+    db: Session, user, msg_in: AssistantMessageIn, conversation_id: str
+) -> AssistantMessageOut:
     text = msg_in.message.strip()
     lower = text.lower()
 
-    if any(k in lower for k in ["how much have i made", "how are sales", "sales today", "what did we sell"]):
+    if any(
+        k in lower
+        for k in [
+            "how much have i made",
+            "how are sales",
+            "sales today",
+            "what did we sell",
+        ]
+    ):
         summary = ai_tools.get_sales_summary(db, user, "today")
         reply = (
             f"{summary['period']}: sales KSh {summary['total_sales']:.0f} across "
             f"{summary['transaction_count']} transactions (avg KSh {summary['average_transaction']:.0f})."
         )
-        return AssistantMessageOut(conversation_id=conversation_id, reply_text=reply, data=summary)
+        return AssistantMessageOut(
+            conversation_id=conversation_id, reply_text=reply, data=summary
+        )
 
-    if "low" in lower and "stock" in lower or "almost finished" in lower or "restock" in lower:
+    if (
+        "low" in lower
+        and "stock" in lower
+        or "almost finished" in lower
+        or "restock" in lower
+    ):
         result = ai_tools.get_low_stock_products(db, user)
         if not result["products"]:
             reply = "Nothing is low on stock right now."
         else:
             names = ", ".join(p["name"] for p in result["products"][:6])
             reply = f"Low on stock: {names}."
-        return AssistantMessageOut(conversation_id=conversation_id, reply_text=reply, data=result)
+        return AssistantMessageOut(
+            conversation_id=conversation_id, reply_text=reply, data=result
+        )
 
     if _SALE_TRIGGER.search(lower):
         segments = [s.strip() for s in _ITEM_SPLIT.split(text) if s.strip()]
@@ -211,7 +306,10 @@ def _rule_based_reply(db: Session, user, msg_in: AssistantMessageIn, conversatio
         cart = ai_tools.calculate_cart(db, user, cart_items)
         if cart["ambiguous"]:
             first = cart["ambiguous"][0]
-            options_text = "\n".join(f"{i+1}. {o['name']} — KSh {o['price']:.0f}" for i, o in enumerate(first["options"]))
+            options_text = "\n".join(
+                f"{i + 1}. {o['name']} — KSh {o['price']:.0f}"
+                for i, o in enumerate(first["options"])
+            )
             return AssistantMessageOut(
                 conversation_id=conversation_id,
                 reply_text=f"Which {first['query']} did you mean?\n{options_text}",
@@ -225,19 +323,33 @@ def _rule_based_reply(db: Session, user, msg_in: AssistantMessageIn, conversatio
                 requires_clarification=True,
             )
 
-        lines = "\n".join(f"{i['quantity']} × {i['name']} — KSh {i['line_total']:.0f}" for i in cart["resolved_items"])
+        lines = "\n".join(
+            f"{i['quantity']} × {i['name']} — KSh {i['line_total']:.0f}"
+            for i in cart["resolved_items"]
+        )
         action_id = str(uuid.uuid4())
         arguments = {
             "items": [
-                {"product_id": i["product_id"], "quantity": i["quantity"], "unit_price": i["unit_price"]}
+                {
+                    "product_id": i["product_id"],
+                    "quantity": i["quantity"],
+                    "unit_price": i["unit_price"],
+                }
                 for i in cart["resolved_items"]
             ],
             "payments": [{"method": "cash", "amount": cart["total"]}],
         }
-        _PENDING_ACTIONS[action_id] = {"conversation_id": conversation_id, "tool_name": "create_sale", "arguments": arguments}
+        _PENDING_ACTIONS[action_id] = {
+            "conversation_id": conversation_id,
+            "tool_name": "create_sale",
+            "arguments": arguments,
+        }
         proposed = ProposedAction(
-            action_id=action_id, tool_name="create_sale", risk_level="high",
-            arguments=arguments, summary=f"Record sale totalling KSh {cart['total']:.0f}",
+            action_id=action_id,
+            tool_name="create_sale",
+            risk_level="high",
+            arguments=arguments,
+            summary=f"Record sale totalling KSh {cart['total']:.0f}",
         )
         return AssistantMessageOut(
             conversation_id=conversation_id,
@@ -254,7 +366,10 @@ def _rule_based_reply(db: Session, user, msg_in: AssistantMessageIn, conversatio
         ),
     )
 
-def process_message(db: Session, user, msg_in: AssistantMessageIn) -> AssistantMessageOut:
+
+def process_message(
+    db: Session, user, msg_in: AssistantMessageIn
+) -> AssistantMessageOut:
     conversation_id = msg_in.conversation_id or str(uuid.uuid4())
 
     if msg_in.confirm_action_id:
@@ -265,24 +380,36 @@ def process_message(db: Session, user, msg_in: AssistantMessageIn) -> AssistantM
                 reply_text="That action isn't waiting for confirmation anymore — nothing was changed.",
             )
         if not msg_in.confirmed:
-            return AssistantMessageOut(conversation_id=conversation_id, reply_text="Okay, cancelled. Nothing was recorded.")
+            return AssistantMessageOut(
+                conversation_id=conversation_id,
+                reply_text="Okay, cancelled. Nothing was recorded.",
+            )
         try:
             result = _execute_tool(db, user, pending["tool_name"], pending["arguments"])
         except ToolError as e:
-            return AssistantMessageOut(conversation_id=conversation_id, reply_text=str(e))
+            return AssistantMessageOut(
+                conversation_id=conversation_id, reply_text=str(e)
+            )
         except Exception as e:
-            return AssistantMessageOut(conversation_id=conversation_id, reply_text=f"Something went wrong: {e}")
+            return AssistantMessageOut(
+                conversation_id=conversation_id, reply_text=f"Something went wrong: {e}"
+            )
 
         if pending["tool_name"] == "create_sale":
             reply = f"Done — receipt {result['receipt_number']}, total KSh {result['total_amount']:.0f}."
         else:
             reply = f"Done. {json.dumps(result)}"
-        return AssistantMessageOut(conversation_id=conversation_id, reply_text=reply, data=result)
+        return AssistantMessageOut(
+            conversation_id=conversation_id, reply_text=reply, data=result
+        )
 
     if settings.AI_PROVIDER == "google" and settings.GEMINI_API_KEY:
         try:
             return _run_with_gemini(db, user, msg_in, conversation_id)
-        except Exception as e:
+        except Exception:
             import traceback
+
             traceback.print_exc()
             return _rule_based_reply(db, user, msg_in, conversation_id)
+
+    return _rule_based_reply(db, user, msg_in, conversation_id)

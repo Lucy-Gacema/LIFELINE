@@ -1,12 +1,13 @@
 from decimal import Decimal
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from lifeline.models.shift import Shift, ShiftStatus
 from lifeline.models.cash_movement import CashMovement, CashMovementType
 from lifeline.models.payment import Payment, PaymentMethod
 from lifeline.models.sale import Sale
-from lifeline.schemas.shifts import ShiftOpen, ShiftClose, CashMovementCreate
+from lifeline.models.shift import Shift, ShiftStatus
+from lifeline.schemas.shifts import CashMovementCreate, ShiftClose, ShiftOpen
 from lifeline.services import audit_service
 
 
@@ -17,7 +18,9 @@ def open_shift(db: Session, data: ShiftOpen, cashier) -> Shift:
         .first()
     )
     if open_existing:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "You already have an open shift.")
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "You already have an open shift."
+        )
 
     shift = Shift(cashier_id=cashier.user_id, opening_cash=data.opening_cash)
     db.add(shift)
@@ -34,18 +37,32 @@ def get_expected_cash(db: Session, shift: Shift) -> Decimal:
         .filter(Sale.shift_id == shift.shift_id, Payment.method == PaymentMethod.CASH)
         .all()
     )
-    total_cash_sales = sum((p.amount for p in cash_sales), Decimal("0"))
+    total_cash_sales = sum((p.amount for p in cash_sales), Decimal(0))
 
-    movements = db.query(CashMovement).filter(CashMovement.shift_id == shift.shift_id).all()
-    drops = sum((m.amount for m in movements if m.type in (CashMovementType.DROP, CashMovementType.PAYOUT)), Decimal("0"))
-    adjustments = sum((m.amount for m in movements if m.type == CashMovementType.ADJUSTMENT), Decimal("0"))
+    movements = (
+        db.query(CashMovement).filter(CashMovement.shift_id == shift.shift_id).all()
+    )
+    drops = sum(
+        (
+            m.amount
+            for m in movements
+            if m.type in (CashMovementType.DROP, CashMovementType.PAYOUT)
+        ),
+        Decimal(0),
+    )
+    adjustments = sum(
+        (m.amount for m in movements if m.type == CashMovementType.ADJUSTMENT),
+        Decimal(0),
+    )
 
     return shift.opening_cash + total_cash_sales - drops + adjustments
 
 
 def close_shift(db: Session, shift: Shift, data: ShiftClose, closer) -> Shift:
     if shift.status != ShiftStatus.OPEN:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This shift is already closed.")
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "This shift is already closed."
+        )
 
     expected = get_expected_cash(db, shift)
     shift.expected_cash = expected
@@ -56,12 +73,20 @@ def close_shift(db: Session, shift: Shift, data: ShiftClose, closer) -> Shift:
     shift.closed_by_manager_id = closer.user_id
 
     from datetime import datetime
+
     shift.closed_at = datetime.utcnow()
 
     audit_service.log_action(
-        db, user_id=closer.user_id, action="shift.closed", entity_type="shift",
+        db,
+        user_id=closer.user_id,
+        action="shift.closed",
+        entity_type="shift",
         entity_id=shift.shift_id,
-        new_value={"expected": float(expected), "actual": float(data.actual_cash), "difference": float(shift.cash_difference)},
+        new_value={
+            "expected": float(expected),
+            "actual": float(data.actual_cash),
+            "difference": float(shift.cash_difference),
+        },
         commit=False,
     )
 
@@ -70,7 +95,9 @@ def close_shift(db: Session, shift: Shift, data: ShiftClose, closer) -> Shift:
     return shift
 
 
-def record_cash_movement(db: Session, shift: Shift, data: CashMovementCreate, user) -> CashMovement:
+def record_cash_movement(
+    db: Session, shift: Shift, data: CashMovementCreate, user
+) -> CashMovement:
     movement = CashMovement(
         shift_id=shift.shift_id,
         type=CashMovementType(data.type),

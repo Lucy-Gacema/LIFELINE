@@ -1,8 +1,17 @@
 import enum
-from typing import Optional
-from sqlalchemy import Column, Integer, Numeric, String, ForeignKey, DateTime, Enum, Boolean
-from sqlalchemy.sql import func
+
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Numeric,
+    String,
+)
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
 from database import Base
 from lifeline.models.types import GUID, new_uuid
 
@@ -31,12 +40,17 @@ class Sale(Base):
     tax_total = Column(Numeric(10, 2), nullable=False, default=0)
     total_amount = Column(Numeric(10, 2), nullable=False)
 
-    status = Column(Enum(SaleStatus, native_enum=False), nullable=False, default=SaleStatus.COMPLETED)
+    status = Column(
+        Enum(SaleStatus, native_enum=False),
+        nullable=False,
+        default=SaleStatus.COMPLETED,
+    )
     note = Column(String, nullable=True)
-    created_via = Column(String, nullable=False, default="manual") 
+    created_via = Column(String, nullable=False, default="manual")
 
-    timestamp = Column(DateTime, nullable=False, default=func.now(), server_default=func.now())
-
+    timestamp = Column(
+        DateTime, nullable=False, default=func.now(), server_default=func.now()
+    )
 
     synced = Column(Boolean, nullable=False, default=True)
     device_id = Column(String, nullable=True)
