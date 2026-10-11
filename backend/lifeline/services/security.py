@@ -1,3 +1,9 @@
+from lifeline.core.security import (
+    hash_secret,
+    verify_secret,
+    create_access_token,
+    decode_access_token,
+)
 from lifeline.core.config import settings
 
 SECRET_KEY = settings.SECRET_KEY

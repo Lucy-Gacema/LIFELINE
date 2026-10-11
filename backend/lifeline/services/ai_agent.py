@@ -16,6 +16,7 @@ from lifeline.services.ai_tools import RISK_LEVELS, ToolError
 
 _CONVERSATIONS: dict = {}
 _PENDING_ACTIONS: dict = {}
+_resolved_model_name: str | None = None
 
 SYSTEM_PROMPT = """You are the built-in Business Assistant for LIFELINE, a point-of-sale app used by \
 small independent shop owners who are often not very technical. Be warm, extremely concise, and use \
@@ -90,6 +91,36 @@ def _get_history(conversation_id: str) -> list:
     return _CONVERSATIONS.setdefault(conversation_id, [])
 
 
+def _resolve_model_name(client) -> str:
+    global _resolved_model_name
+    if _resolved_model_name is not None:
+        return _resolved_model_name
+
+    candidates = [
+        settings.AI_MODEL,
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-3.6-flash",
+        "gemini-3.8-flash",
+    ]
+
+    try:
+        available = {m.name.replace("models/", "") for m in client.models.list()}
+    except Exception:
+        _resolved_model_name = settings.AI_MODEL
+        return _resolved_model_name
+
+    for candidate in candidates:
+        if candidate and candidate in available:
+            _resolved_model_name = candidate
+            return _resolved_model_name
+
+    raise RuntimeError(
+        "None of the candidate Gemini models are available for this API key. "
+        "Available: " + ", ".join(sorted(available))
+    )
+
+
 def _summarize_tool_call(tool_name: str, arguments: dict) -> str:
     if tool_name == "create_sale":
         items = arguments.get("items", [])
@@ -129,6 +160,7 @@ def _run_with_gemini(
     from google.genai import types
 
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    model_name = _resolve_model_name(client)
     history = _get_history(conversation_id)
     history.append(
         types.Content(role="user", parts=[types.Part.from_text(text=msg_in.message)])
@@ -148,7 +180,7 @@ def _run_with_gemini(
         )
 
         response = client.models.generate_content(
-            model=settings.AI_MODEL,
+            model=model_name,
             contents=history,
             config=config,
         )

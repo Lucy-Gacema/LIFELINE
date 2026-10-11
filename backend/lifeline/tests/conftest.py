@@ -1,7 +1,21 @@
+"""
+Shared pytest fixtures for the whole Lifeline test suite.
+
+Design choices worth knowing:
+- Every test run gets a throwaway SQLite file (never your real lifeline.db).
+- AI_PROVIDER is forced to "none" so the assistant tests exercise the
+  deterministic rule-based fallback rather than hitting a live LLM API
+  (paid, rate-limited, and non-deterministic — all wrong for a test suite).
+  If you've switched providers (e.g. to Gemini) in your own .env, that's
+  irrelevant here: this env var is set BEFORE the app is imported, so it
+  always overrides whatever is in .env for the test process only.
+- Three role fixtures (admin/manager/cashier) exist because so much of this
+  app's correctness is about *who* is allowed to do *what*.
+"""
 import os
 import sys
-import tempfile
 import uuid
+import tempfile
 
 import pytest
 
@@ -12,12 +26,11 @@ os.environ["SECRET_KEY"] = "test-secret-key-not-for-production"
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from fastapi.testclient import TestClient
-
-from database import Base, sessionLocal
-from lifeline.core.security import hash_secret
-from lifeline.models.user import User, UserRole
-from main import app
+from fastapi.testclient import TestClient  # noqa: E402
+from database import sessionLocal, Base, engine  # noqa: E402
+from main import app  # noqa: E402
+from lifeline.core.security import hash_secret  # noqa: E402
+from lifeline.models.user import User, UserRole  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -70,9 +83,7 @@ def _create_user_and_login(client, role, email=None, pin=None):
     user_id = str(user.user_id)
     db.close()
 
-    resp = client.post(
-        "/api/v1/auth/login", data={"username": email, "password": "password123"}
-    )
+    resp = client.post("/api/v1/auth/login", data={"username": email, "password": "password123"})
     assert resp.status_code == 200, resp.text
     return {"token": resp.json()["access_token"], "user_id": user_id, "email": email}
 
@@ -122,7 +133,6 @@ def cashier_headers(cashier):
 # them multiple times with different arguments in the same test.
 # ---------------------------------------------------------------------------
 
-
 def make_product(client, headers, **overrides):
     payload = {
         "product_name": f"Test Product {uuid.uuid4().hex[:6]}",
@@ -156,8 +166,6 @@ def make_sale(client, headers, items, payments, **overrides):
 
 @pytest.fixture()
 def open_shift(client, admin_headers):
-    resp = client.post(
-        "/api/v1/shifts/open", json={"opening_cash": 1000}, headers=admin_headers
-    )
+    resp = client.post("/api/v1/shifts/open", json={"opening_cash": 1000}, headers=admin_headers)
     assert resp.status_code == 201, resp.text
     return resp.json()
